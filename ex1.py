@@ -34,7 +34,8 @@ def bigram_make(corpus):
   vocab = np.unique([id for c in corpus for id in c])
   bigram = {
     "vocab" : vocab,
-    "freqs" : np.zeros((vocab.size+1, vocab.size+1), dtype=int)
+    "freqs" : np.zeros((vocab.size+1, vocab.size+1), dtype=int),
+    "probs" : np.zeros((vocab.size+1, vocab.size+1), dtype=int)
   }
   vocab_index = {token_id: i for i, token_id in enumerate(vocab)}
   for sent in corpus:
@@ -63,6 +64,7 @@ def eval_bigram(bigram_dict, corpus, alpha):
       bi_count = freqs[tok0_vid][tok1_vid]
       uni_count = np.sum(freqs[tok0_vid])
       P = (bi_count + alpha) / (uni_count + alpha * len(tokenizer))
+      bigram_dict["probs"][tok0_vid][tok1_vid] = P
 
       log_prob_sum += np.log2(P)
       N += 1
@@ -125,5 +127,23 @@ def test_bigram():
   ## Show the training-size -> entropy graph
   plt.plot(train_pcts, entropies_per_train_pct)
 
+  print("Trying some autocomplete")
+  freqs = bigram["freqs"]
+  probs = bigram["freqs"]
+  vocab = bigram["vocab"]
+  text = "The new"
+  ids = [tokenizer.convert_tokens_to_ids("START")] + tokenizer.encode(text, add_special_tokens=False)
+  vocab_index = {token_id: i for i, token_id in enumerate(vocab)}
+  while ids[-1] != end_id:
+    tok0_vid = vocab_index.get(ids[-1], vocab.size)
+    f = freqs[tok0_vid]
+    p = probs[tok0_vid]
+    if f.sum() == 0:
+      break
+    max_tok_idx = np.argmax(p[:-1])
+    ids.append(int(vocab[max_tok_idx]))
+  print(text, " -> ", tokenizer.decode(ids, skip_special_tokens=True))
+
 test_bigram()
+
 

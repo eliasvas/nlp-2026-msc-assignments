@@ -16,7 +16,7 @@ special_tokens = {
     "additional_special_tokens": ["START", "END"]
 }
 tokenizer.add_special_tokens(special_tokens)
-start_id = tokenizer.convert_tokens_to_ids("START") 
+start_id = tokenizer.convert_tokens_to_ids("START")
 end_id = tokenizer.convert_tokens_to_ids("END")
 
 
@@ -35,7 +35,7 @@ def bigram_make(corpus):
   bigram = {
     "vocab" : vocab,
     "freqs" : np.zeros((vocab.size+1, vocab.size+1), dtype=int),
-    "probs" : np.zeros((vocab.size+1, vocab.size+1), dtype=int)
+    "probs" : np.zeros((vocab.size+1, vocab.size+1), dtype=float)
   }
   vocab_index = {token_id: i for i, token_id in enumerate(vocab)}
   for sent in corpus:
@@ -68,11 +68,6 @@ def eval_bigram(bigram_dict, corpus, alpha):
 
       log_prob_sum += np.log2(P)
       N += 1
-
-      #print(tokenizer.convert_ids_to_tokens(ids[i]),"+", tokenizer.convert_ids_to_tokens(ids[i+1]), bi_count)
-      #print(tokenizer.convert_ids_to_tokens(ids[i]), "has overall count:", uni_count)
-      #print("P(", tokenizer.convert_ids_to_tokens(sentence[i]),"+", tokenizer.convert_ids_to_tokens(sentence[i+1]), ") = ", P)
-
   cross_entropy = -log_prob_sum / N if N > 0 else float("inf")
   perplexity = 2 ** cross_entropy
   return cross_entropy, perplexity, N
@@ -87,7 +82,7 @@ def test_bigram():
   entropies_per_train_pct = []
 
   plt.figure(figsize=(5, 2.7), layout='constrained')
-  plt.xlabel('training set slice')
+  plt.xlabel('training set slice (%)')
   plt.ylabel('cross-entropy')
   plt.title("Training w/ different sizes")
 
@@ -127,11 +122,12 @@ def test_bigram():
   ## Show the training-size -> entropy graph
   plt.plot(train_pcts, entropies_per_train_pct)
 
-  print("Trying some autocomplete")
+  #################################
+  ## Trying autocomplete
   freqs = bigram["freqs"]
-  probs = bigram["freqs"]
+  probs = bigram["probs"]
   vocab = bigram["vocab"]
-  text = "The new"
+  text = "The new general"
   ids = [tokenizer.convert_tokens_to_ids("START")] + tokenizer.encode(text, add_special_tokens=False)
   vocab_index = {token_id: i for i, token_id in enumerate(vocab)}
   while ids[-1] != end_id:
@@ -140,8 +136,17 @@ def test_bigram():
     p = probs[tok0_vid]
     if f.sum() == 0:
       break
-    max_tok_idx = np.argmax(p[:-1])
-    ids.append(int(vocab[max_tok_idx]))
+
+    temperature = 0.1
+    # this is to skip the invalid index..
+    p = p[:-1]
+    sampling_probs = np.exp(np.log(p + 1e-10) / temperature)
+    sampling_probs /= sampling_probs.sum()
+    next_tok_idx = np.random.choice(len(vocab), p=sampling_probs)
+
+    ids.append(int(vocab[next_tok_idx]))
+
+
   print(text, " -> ", tokenizer.decode(ids, skip_special_tokens=True))
 
 test_bigram()

@@ -1,6 +1,10 @@
 #############################
 ## Sample N-Gram model trained on genesis corpus
 
+nltk.download('genesis')
+nltk.download('punkt')
+nltk.download('punkt_tab')
+
 import nltk
 import numpy as np
 import matplotlib.pyplot as plt
@@ -8,8 +12,6 @@ from collections import defaultdict
 from nltk.corpus import genesis
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 from tokenizers import Tokenizer, models, trainers, pre_tokenizers
-nltk.download("genesis")
-
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 special_tokens = {
     "additional_special_tokens": ["START", "END"]
@@ -98,7 +100,7 @@ def autocomplete_bigram(bigram_dict, text):
 def test_bigram():
   ####################################
   ## Produce training sentences
-  all_sentences = brown.sents()[:1000]
+  all_sentences = genesis.sents()[:1000]
 
   train_pcts = [0.2, 0.5, 0.8, 0.9, 1.0]
   entropies_per_train_pct = []
@@ -167,5 +169,4 @@ def test_bigram():
 
 
 test_bigram()
-
 

@@ -1,15 +1,14 @@
 #############################
-## AutoTokenizer example
-## https://huggingface.co/docs/transformers/main_classes/tokenizer
+## Sample N-Gram model trained on genesis corpus
 
 import nltk
 import numpy as np
 import matplotlib.pyplot as plt
-from collections import Counter, defaultdict
-from nltk.corpus import brown
+from collections import defaultdict
+from nltk.corpus import genesis
 from transformers import AutoTokenizer, PreTrainedTokenizerFast
 from tokenizers import Tokenizer, models, trainers, pre_tokenizers
-nltk.download("brown")
+nltk.download("genesis")
 
 tokenizer = AutoTokenizer.from_pretrained("gpt2")
 special_tokens = {
@@ -72,6 +71,29 @@ def eval_bigram(bigram_dict, corpus, alpha):
   perplexity = 2 ** cross_entropy
   return cross_entropy, perplexity, N
 
+def autocomplete_bigram(bigram_dict, text):
+  freqs = bigram_dict["freqs"]
+  probs = bigram_dict["probs"]
+  vocab = bigram_dict["vocab"]
+  ids = [tokenizer.convert_tokens_to_ids("START")] + tokenizer.encode(text, add_special_tokens=False)
+  vocab_index = {token_id: i for i, token_id in enumerate(vocab)}
+  while ids[-1] != end_id:
+    tok0_vid = vocab_index.get(ids[-1], vocab.size)
+    f = freqs[tok0_vid]
+    p = probs[tok0_vid]
+    if f.sum() == 0:
+      break
+
+    temperature = 0.6
+    # this is to skip the invalid index..
+    p = p[:-1]
+    sampling_probs = np.exp(np.log(p + 1e-10) / temperature)
+    sampling_probs /= sampling_probs.sum()
+    next_tok_idx = np.random.choice(len(vocab), p=sampling_probs)
+
+    ids.append(int(vocab[next_tok_idx]))
+  return ids
+
 
 def test_bigram():
   ####################################
@@ -80,11 +102,7 @@ def test_bigram():
 
   train_pcts = [0.2, 0.5, 0.8, 0.9, 1.0]
   entropies_per_train_pct = []
-
-  plt.figure(figsize=(5, 2.7), layout='constrained')
-  plt.xlabel('training set slice (%)')
-  plt.ylabel('cross-entropy')
-  plt.title("Training w/ different sizes")
+  perplexities_per_train_pct = []  
 
   for train_pct in train_pcts:
     ####################################
@@ -117,37 +135,36 @@ def test_bigram():
     ## Evaluate every sentence in the test corpus
     CE,P,N = eval_bigram(bigram, test_corpus, best_alpha)
     entropies_per_train_pct.append(CE)
+    perplexities_per_train_pct.append(P)
 
   #################################
   ## Show the training-size -> entropy graph
+  plt.figure(figsize=(5, 2.7), layout='constrained')
+  plt.xlabel("training set slice (%)")
+  plt.ylabel("cross-entropy")
+  plt.title("Training w/ different sizes")
   plt.plot(train_pcts, entropies_per_train_pct)
+
+
+  #################################
+  ## Show the training-size -> perplexity graph
+  plt.figure(figsize=(5, 2.7), layout='constrained')
+  plt.xlabel("training set slice (%)")
+  plt.ylabel("perplexity")
+  plt.title("Training w/ different sizes")
+  plt.plot(train_pcts, perplexities_per_train_pct)
 
   #################################
   ## Trying autocomplete
-  freqs = bigram["freqs"]
-  probs = bigram["probs"]
-  vocab = bigram["vocab"]
-  text = "The new general"
-  ids = [tokenizer.convert_tokens_to_ids("START")] + tokenizer.encode(text, add_special_tokens=False)
-  vocab_index = {token_id: i for i, token_id in enumerate(vocab)}
-  while ids[-1] != end_id:
-    tok0_vid = vocab_index.get(ids[-1], vocab.size)
-    f = freqs[tok0_vid]
-    p = probs[tok0_vid]
-    if f.sum() == 0:
-      break
+  texts = [
+      "I would like to",
+      "Hello there",
+      "I can't find my"
+  ]
+  for text in texts:
+    ids = autocomplete_bigram(bigram, text)
+    print(text, " -> ", tokenizer.decode(ids, skip_special_tokens=True))
 
-    temperature = 0.1
-    # this is to skip the invalid index..
-    p = p[:-1]
-    sampling_probs = np.exp(np.log(p + 1e-10) / temperature)
-    sampling_probs /= sampling_probs.sum()
-    next_tok_idx = np.random.choice(len(vocab), p=sampling_probs)
-
-    ids.append(int(vocab[next_tok_idx]))
-
-
-  print(text, " -> ", tokenizer.decode(ids, skip_special_tokens=True))
 
 test_bigram()
 

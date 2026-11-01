@@ -1,11 +1,11 @@
 #############################
 ## Sample N-Gram model trained on genesis corpus
 
+import nltk
 nltk.download('genesis')
 nltk.download('punkt')
 nltk.download('punkt_tab')
 
-import nltk
 import numpy as np
 import matplotlib.pyplot as plt
 from collections import defaultdict
@@ -69,7 +69,7 @@ def eval_bigram(bigram_dict, corpus, alpha):
 
       log_prob_sum += np.log2(P)
       N += 1
-  cross_entropy = -log_prob_sum / N if N > 0 else float("inf")
+  cross_entropy = -log_prob_sum / N
   perplexity = 2 ** cross_entropy
   return cross_entropy, perplexity, N
 
@@ -104,7 +104,7 @@ def test_bigram():
 
   train_pcts = [0.2, 0.5, 0.8, 0.9, 1.0]
   entropies_per_train_pct = []
-  perplexities_per_train_pct = []  
+  perplexities_per_train_pct = []
 
   for train_pct in train_pcts:
     ####################################
@@ -169,4 +169,5 @@ def test_bigram():
 
 
 test_bigram()
+
 

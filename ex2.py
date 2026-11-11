@@ -102,16 +102,42 @@ for k in [10, 50, 200, 500]:
       best_k = k
       best_lambda_reg = reg
 
-#retrain with best k, reg, etc
-X_train, best_vocab, best_idx = calc_tf_all(x_train, vocab, vword_to_idx, best_k)
-w, b = train(X_train, y_train, epochs=100, lr=0.1, lambda_reg=best_lambda_reg)
-
-
 
 print("Best k:", best_k)
 print("Best lambda_reg:", best_lambda_reg)
-print("Accuracy:", acc)
 
+
+# Calculate the final train/test/dev sets
+X_train, best_vocab, best_idx = calc_tf_all(x_train, vocab, vword_to_idx, best_k)
+X_test, _, _ = calc_tf_all(x_test, vocab, vword_to_idx, best_k)
+X_dev, _, _ = calc_tf_all(x_dev, vocab, vword_to_idx, best_k)
+# Find the weight for the best lambda and k
+w, b = train(X_train, y_train, epochs=100, lr=0.1, lambda_reg=best_lambda_reg)
+
+
+for my_classify in [classify, majority_classify]:
+  print(f"Results for classifier: {my_classify.__name__}")
+  for set_name, my_set, my_y in [
+      ("train", X_train, y_train),
+      ("dev", X_dev, y_dev),
+      ("test", X_test, y_test),
+  ]:
+    print(f"\t and the {set_name} set.")
+    predictions = my_classify(my_set, w, b)
+    true_positives = np.sum((predictions == 1) & (my_y == 1))
+    false_positives = np.sum((predictions == 1) & (my_y == 0))
+    false_negatives = np.sum((predictions == 0) & (my_y == 1))
+    true_negatives = np.sum((predictions == 0) & (my_y == 0))
+    precision = true_positives / (true_positives + false_positives)
+    recall = true_positives / (true_positives + false_negatives)
+    pr_auc = 0 # for now
+    print(f"Accuracy: {(best_acc*100):.2f}%")
+    print(f"Precision:  {(precision*100):.2f} %")
+    print(f"Recall:     {(recall*100):.2f} %")
+    print(f"PR_AUC:     {(pr_auc*100):.2f} %")
+
+
+"""
 # 3. Predict sentiment for new sentence
 new_sentence = "This film is like very bad"
 new_tf = compute_tf(best_vocab, best_idx, new_sentence)
@@ -122,3 +148,4 @@ print("Predicted sentiment:", "Positive" if (new_class == 1) else "Negative")
 
 new_class_majority = majority_classify(new_tf, w, b)
 print("Predicted sentiment (majority):", "Positive" if (new_class_majority == 1) else "Negative")
+"""

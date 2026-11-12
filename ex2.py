@@ -2,6 +2,10 @@ import numpy as np
 from collections import Counter
 import re
 
+import matplotlib.pyplot as plt
+
+from sklearn.metrics import average_precision_score, f1_score
+
 STOPWORDS = set([
     "the", "is", "a", "an", "and", "or", "but",
     "this", "that", "these", "those",
@@ -79,6 +83,34 @@ def majority_classify(X, w, b):
     majority = np.bincount(y_train).argmax()
     return np.full(X.shape[0], majority)
 
+class Quality_Metrics:
+  precision : float
+  recall : float
+  accuracy : float
+  f1 : float
+  pr_auc : float
+  def __init__(self, precision, recall, accuracy, f1, pr_auc):
+    self.precision = precision
+    self.recall = recall
+    self.accuracy = accuracy
+    self.f1 = f1
+    self.pr_auc = pr_auc
+  def __add__(self, other):
+    return Quality_Metrics(
+        self.precision + other.precision,
+        self.recall + other.recall,
+        self.accuracy + other.accuracy,
+        self.f1 + other.f1,
+        self.pr_auc + other.pr_auc
+    )
+  def __truediv__(self, other):
+    return Quality_Metrics(
+        self.precision / other,
+        self.recall / other,
+        self.accuracy / other,
+        self.f1 / other,
+        self.pr_auc / other
+    )
 
 vocab = sorted(set(
   w.lower()
@@ -128,17 +160,33 @@ for set_name, my_set, my_y in [
       precision = tp / (tp + fp) if tp + fp > 0 else 0
       recall = tp / (tp + fn) if tp + fn > 0 else 0
       acc = np.mean(predictions == my_y)
-      pr_auc = 0 # for now
+
+      #WIP
+      f1 = f1_score(my_y, predictions, pos_label=cls, zero_division=0)
+      scores = (predictions == cls).astype(int)
+      pr_auc = average_precision_score(
+          (my_y == cls).astype(int), scores
+      )
+
+      m = Quality_Metrics(precision, recall, acc, f1, pr_auc)
       metrics.append(
           ['+' if cls == 1 else '-',
           'majority' if 'majority' in my_classify.__name__ else 'logistic',
-           acc, precision, recall, pr_auc])
-      
-  
-  total = 6*12
+           m])
+
+  total = 7*12
   pad = (total - len(set_name)) // 2
   print('-' * pad, end="");print(set_name, end="");print('-' * pad)
-  print(f"{'class':>12}{'classifier':>12}{'acc':>12}{'prec':>12}{'recall':>12}{'auc':>12}")
+  print(f"{'class':>12}{'classifier':>12}{'acc':>12}{'prec':>12}{'recall':>12}{'f1':>12}{'auc':>12}")
+  
+  avgs = [Quality_Metrics(0,0,0,0,0), Quality_Metrics(0,0,0,0,0)]
   for metric in metrics:
-    print(f"{metric[0]:>12}{metric[1]:>12}{metric[2]:>12.2f}{metric[3]:>12.2f}{metric[4]:>12.2f}{metric[5]:>12.2f}")
+    m = metric[2]
+    avgs[0 if metric[1] == 'majority' else 1] += m
+    print(f"{metric[0]:>12}{metric[1]:>12}{m.accuracy:>12.2f}{m.precision:>12.2f}{m.recall:>12.2f}{m.f1:>12.2f}{m.pr_auc:>12.2f}")
+  for idx, avg in enumerate(avgs):
+    avg /= 2 # 1 for (+) 1 for (-) for each classifier
+    print(f"{'macro':>12}{'majority' if idx == 0 else 'logistic':>12}{avg.accuracy:>12.2f}{avg.precision:>12.2f}{avg.recall:>12.2f}{avg.f1:>12.2f}{avg.pr_auc:>12.2f}")
+
   print('-' * total)
+

@@ -117,9 +117,6 @@ for set_name, my_set, my_y in [
     ("dev", X_dev, y_dev),
     ("test", X_test, y_test),
 ]:
-  total = 60
-  pad = (total - len(set_name)) // 2
-  print('-' * pad, end="");print(set_name, end="");print('-' * pad)
   metrics = []
   for cls in [0,1]:
     for cidx, my_classify in enumerate([classify, majority_classify]):
@@ -136,7 +133,12 @@ for set_name, my_set, my_y in [
           ['+' if cls == 1 else '-',
           'majority' if 'majority' in my_classify.__name__ else 'logistic',
            acc, precision, recall, pr_auc])
-  print(f"{'classifier':>10}{'class':>10}{'acc':>10}{'prec':>10}{'recall':>10}{'auc':>10}")
+      
+  
+  total = 6*12
+  pad = (total - len(set_name)) // 2
+  print('-' * pad, end="");print(set_name, end="");print('-' * pad)
+  print(f"{'class':>12}{'classifier':>12}{'acc':>12}{'prec':>12}{'recall':>12}{'auc':>12}")
   for metric in metrics:
-    print(f"{metric[0]:^10}{metric[1]:>10}{metric[2]:>10.2f}{metric[3]:>10.2f}{metric[4]:>10.2f}{metric[5]:>10.2f}")
+    print(f"{metric[0]:>12}{metric[1]:>12}{metric[2]:>12.2f}{metric[3]:>12.2f}{metric[4]:>12.2f}{metric[5]:>12.2f}")
   print('-' * total)

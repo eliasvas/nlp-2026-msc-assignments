@@ -1,11 +1,34 @@
+%pip install --upgrade pip --quiet
+%pip install notebook jupyter --quiet
+%pip install nltk --quiet
+%pip install spacy --quiet
+%pip install numpy --quiet
+%pip install scikit-learn --quiet
+%pip install pandas --quiet
+%pip install matplotlib seaborn --quiet
+%pip install umap-learn --quiet
+%pip install wget --quiet
+
+
+import wget
+url = "http://www.cs.cornell.edu/people/pabo/movie-review-data/review_polarity.tar.gz"
+filename = wget.download(url)
+#print(filename)
+!tar xzf review_polarity.tar.gz
+from sklearn.datasets import load_files
+movies = load_files(container_path="txt_sentoken", encoding="utf-8")
+x, y = movies.data, movies.target
+
+# The above part is taken straight from the lab..
+
 import numpy as np
 from collections import Counter
 import re
 
 import matplotlib.pyplot as plt
-
 from sklearn.metrics import average_precision_score
 
+# yes this isn't the best solution..
 STOPWORDS = set("""
 the is a an and or but
 this that these those
@@ -254,3 +277,23 @@ plt.ylim(0, 1)
 plt.legend()
 plt.grid()
 plt.show()
+
+
+"""
+> Dataset: I used the cornell review polarity dataset that has binary classifiaction of film reviews.
+  As can be seen the graphs are the same as for the accompanying lab's. We have two classes (+) and (-)
+  with 1000 documents for each and similar word distributions for each class.
+> On how this whole thing works:
+  1.) We preprocess the reviews to remove common stopwords - for speed and so that we don't choose them for the vocab.
+  2.) For vocabulary calculation initially we just get every word in the documents (we will chop this up with k)
+  3.) Now we have to train with X_train and evaluate on X_dev so that we can tune the hyperparameters (lamda_reg and k).
+  4.) For every hyperparameter combination we train using logistic regression (sigmoid) with regularization (helped a lot).
+  5.) After training we evaluate on the development set and compute/store the combination k+lambda_reg that gives the best accuracy.
+  6.) Now we have the best possible combination so we train once more with the optimal hyperparameters to learn the final weights / bias.
+  7.) With this classifier and using a dumb majority classifier for comparison, we compute the quality metrics (prec,recall,f1,pr_auc) for all the three sets.
+  8.) We do a textual representation for each classifier/class in each training set and then compute also the macro (averaged) results per classifier/class.
+  9.) Finally we calculate the learning curves by using every increasing slices of the training set, and we plot the dev and train sets for both classifiers.
+"""
+
+
+

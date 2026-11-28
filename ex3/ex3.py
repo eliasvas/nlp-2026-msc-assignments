@@ -20,15 +20,15 @@ movies = load_files(container_path="txt_sentoken", encoding="utf-8")
 x, y = movies.data, movies.target
 
 # The above part is taken straight from the lab..
-
 import numpy as np
 from collections import Counter
 import re
 
 import matplotlib.pyplot as plt
+
 from sklearn.metrics import average_precision_score
 
-# yes this isn't the best solution..
+# yes this isnt the best solution..
 STOPWORDS = set("""
 the is a an and or but
 this that these those
@@ -76,7 +76,7 @@ def calc_tf_all(docs, vocab, vword_to_idx, k=7):
   return tf[:, sel], sel_vocab, sel_idx
 
 
-def train(X, y, epochs=1000, lr=0.1, lambda_reg = 0.01):
+def train_logistic(X, y, epochs=1000, lr=0.1, lambda_reg = 0.01):
   w = np.zeros(X.shape[1])
   b = 0.0
   for epoch in range(epochs):
@@ -93,16 +93,25 @@ def train(X, y, epochs=1000, lr=0.1, lambda_reg = 0.01):
     b -= lr * db
   return w, b
 
-def classify(X, w, b):
+def classify_mlp(X, w, b):
   pred = sigmoid(np.dot(X, w) + b)
   pred_labels = (pred >= 0.5).astype(int)
   return pred_labels
 
-def evaluate(X, y, w, b):
-  pred_labels = classify(X,w,b)
+def evaluate_mlp(X, y, w, b):
+  pred_labels = classify_logistic(X,w,b)
   return np.mean(pred_labels == y)
 
-def majority_classify(X, w, b):
+def classify_logistic(X, w, b):
+  pred = sigmoid(np.dot(X, w) + b)
+  pred_labels = (pred >= 0.5).astype(int)
+  return pred_labels
+
+def evaluate_logistic(X, y, w, b):
+  pred_labels = classify_logistic(X,w,b)
+  return np.mean(pred_labels == y)
+
+def classify_majority(X, w, b):
     majority = np.bincount(y_train).argmax()
     return np.full(X.shape[0], majority)
 
@@ -157,28 +166,29 @@ vocab = sorted(set(
 ))
 vword_to_idx = {w:idx for idx, w in enumerate(vocab)}
 
+# train logistic
 best_k, best_lambda_reg, best_acc = 0, 0, 0
 for k in [10, 50, 200, 500]:
   X_train, vocab_k, idx_k = calc_tf_all(x_train, vocab, vword_to_idx, k)
   X_dev  = np.array([compute_tf(vocab_k, idx_k, d) for d in x_dev])
 
   for reg in [0.001, 0.01, 0.1]:
-    w, b = train(X_train, y_train, epochs=100, lr=1, lambda_reg=reg)
-    acc = evaluate(X_dev, y_dev, w, b)
+    w, b = train_logistic(X_train, y_train, epochs=100, lr=1, lambda_reg=reg)
+    acc = evaluate_logistic(X_dev, y_dev, w, b)
     if acc > best_acc:
       best_acc = acc
       best_k = k
       best_lambda_reg = reg
 
-print("Best k:", best_k)
-print("Best lambda_reg:", best_lambda_reg)
+print("Logistic best k:", best_k)
+print("Logistic best lambda_reg:", best_lambda_reg)
 
 # Calculate the final train/test/dev sets
 X_train, best_vocab, best_idx = calc_tf_all(x_train, vocab, vword_to_idx, best_k)
 X_dev  = np.array([compute_tf(best_vocab, best_idx, d) for d in x_dev])
 X_test = np.array([compute_tf(best_vocab, best_idx, d) for d in x_test])
 # Find the weight for the best lambda and k
-w, b = train(X_train, y_train, epochs=100, lr=1, lambda_reg=best_lambda_reg)
+w, b = train_logistic(X_train, y_train, epochs=100, lr=1, lambda_reg=best_lambda_reg)
 
 
 for set_name, my_set, my_y in [
@@ -188,7 +198,7 @@ for set_name, my_set, my_y in [
 ]:
   metrics = []
   for cls in [0,1]:
-    for cidx, my_classify in enumerate([classify, majority_classify]):
+    for cidx, my_classify in enumerate([classify_logistic, classify_majority, classify_mlp]):
       predictions = my_classify(my_set, w, b)
       tp = np.sum((predictions == cls) & (my_y == cls))
       fp = np.sum((predictions == cls) & (my_y != cls))
@@ -208,7 +218,7 @@ for set_name, my_set, my_y in [
       m = Quality_Metrics(precision, recall, acc, f1, pr_auc)
       metrics.append(
           ['+' if cls == 1 else '-',
-          'majority' if 'majority' in my_classify.__name__ else 'logistic', m]
+          'majority' if 'majority' in my_classify.__name__ else 'logistic' if 'logistic' in my_classify.__name__ else 'mlp', m]
       )
 
   total = 7*12
@@ -216,20 +226,24 @@ for set_name, my_set, my_y in [
   print('-' * pad, end="");print(set_name, end="");print('-' * pad)
   print(f"{'class':>12}{'classifier':>12}{'acc':>12}{'prec':>12}{'recall':>12}{'f1':>12}{'auc':>12}")
 
-  avgs = [Quality_Metrics(0,0,0,0,0), Quality_Metrics(0,0,0,0,0)]
+  avgs = [Quality_Metrics(0,0,0,0,0), Quality_Metrics(0,0,0,0,0), Quality_Metrics(0,0,0,0,0)]
   for metric in metrics:
     m = metric[2]
     avgs[0 if metric[1] == 'majority' else 1] += m
     print(f"{metric[0]:>12}{metric[1]:>12}{m.accuracy:>12.2f}{m.precision:>12.2f}{m.recall:>12.2f}{m.f1:>12.2f}{m.pr_auc:>12.2f}")
   for idx, avg in enumerate(avgs):
     avg /= 2 # 1 for (+) 1 for (-) for each classifier
-    print(f"{'macro':>12}{'majority' if idx == 0 else 'logistic':>12}{avg.accuracy:>12.2f}{avg.precision:>12.2f}{avg.recall:>12.2f}{avg.f1:>12.2f}{avg.pr_auc:>12.2f}")
+    print(f"{'macro':>12}{'majority' if idx == 0 else 'logistic' if idx == 1 else 'mlp':>12}{avg.accuracy:>12.2f}{avg.precision:>12.2f}{avg.recall:>12.2f}{avg.f1:>12.2f}{avg.pr_auc:>12.2f}")
   print('-' * total)
 
 
 
+mlp_train = []
+mlp_dev = []
+
 logistic_train = []
 logistic_dev = []
+
 majority_train = []
 majority_dev = []
 
@@ -237,11 +251,17 @@ percentages = [0.1, 0.3, 0.7, 1]
 for percentage in percentages:
   X_subset = X_train[:int(percentage * len(X_train))]
   y_subset = y_train[:int(percentage * len(y_train))]
-  w, b = train(X_subset, y_subset, epochs=100, lr=1, lambda_reg=best_lambda_reg)
+  w, b = train_logistic(X_subset, y_subset, epochs=100, lr=1, lambda_reg=best_lambda_reg)
+
+  # mlp
+  train_pred = classify_mlp(X_subset, w, b)
+  dev_pred = classify_mlp(X_dev, w, b)
+  mlp_train.append(calc_macro_f1(y_subset, train_pred))
+  mlp_dev.append(calc_macro_f1(y_dev, dev_pred))
 
   # logistic
-  train_pred = classify(X_subset, w, b)
-  dev_pred = classify(X_dev, w, b)
+  train_pred = classify_logistic(X_subset, w, b)
+  dev_pred = classify_logistic(X_dev, w, b)
   logistic_train.append(calc_macro_f1(y_subset, train_pred))
   logistic_dev.append(calc_macro_f1(y_dev, dev_pred))
 
@@ -252,10 +272,24 @@ for percentage in percentages:
   majority_train.append(calc_macro_f1(y_subset, train_pred))
   majority_dev.append(calc_macro_f1(y_dev, dev_pred))
 
+
+# mlp plot
+plt.figure(figsize=(7, 5))
+plt.plot(percentages, mlp_train, marker='o', label='Training')
+plt.plot(percentages, mlp_dev, marker='o', label='Development')
+plt.title("MLP learning curve")
+plt.xlabel("train split")
+plt.ylabel("macro_f1")
+plt.xticks(percentages, ['10%', '30%', '70%', '100%'])
+plt.ylim(0, 1)
+plt.legend()
+plt.grid()
+plt.show()
+
+# logistic plot
 plt.figure(figsize=(7, 5))
 plt.plot(percentages, logistic_train, marker='o', label='Training')
 plt.plot(percentages, logistic_dev, marker='o', label='Development')
-# logistic plot
 plt.title("Logistic learning curve")
 plt.xlabel("train split")
 plt.ylabel("macro_f1")
@@ -294,6 +328,3 @@ plt.show()
   8.) We do a textual representation for each classifier/class in each training set and then compute also the macro (averaged) results per classifier/class.
   9.) Finally we calculate the learning curves by using every increasing slices of the training set, and we plot the dev and train sets for both classifiers.
 """
-
-
-
